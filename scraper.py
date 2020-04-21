@@ -3,22 +3,15 @@ import requests
 from bs4 import BeautifulSoup
 
 
-def scrape(bechdel_test_url):
-    html = requests.get(bechdel_test_url).text
-    soup = BeautifulSoup(html, 'html.parser')
-
-    all_movies = soup.find_all('div', attrs='movie')
+def process_movies(all_movies):
     processed_movies = []
-
-    # for i in range(2):
-    #     movie = all_movies[i*5]
     for movie in all_movies:
         new_movie = {
             "bechdel_id": "",
             "bechdel_url": "",
             "title": "",
             "imdb_url": "",
-            "pass": None,
+            "pass": "",
         }
         all_urls = movie.find_all('a')
 
@@ -33,7 +26,7 @@ def scrape(bechdel_test_url):
                 else:
                     new_movie["pass"] = True
             elif re.search('view', url_href):
-                new_movie["bechdel_url"] = url_href
+                new_movie["bechdel_url"] = "https://bechdeltest.com" + url_href
 
                 if url.text:
                     new_movie["title"] = url.text
@@ -41,6 +34,14 @@ def scrape(bechdel_test_url):
                     new_movie["bechdel_id"] = url.get("id").split("-")[1]
         processed_movies.append(new_movie)
     return processed_movies
+
+
+def scrape(bechdel_test_url):
+    html = requests.get(bechdel_test_url).text
+    soup = BeautifulSoup(html, 'html.parser')
+
+    all_movies = soup.find_all('div', attrs='movie')
+    return process_movies(all_movies)
 
 
 homepage = "https://bechdeltest.com/"
