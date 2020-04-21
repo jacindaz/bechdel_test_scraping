@@ -122,4 +122,4 @@ page42 = "https://bechdeltest.com/?page=42"
 
 # print(scrape("https://bechdeltest.com/?page=19"))
 # database_setup()
-print(find_movie_counts())
+# print(find_movie_counts())
