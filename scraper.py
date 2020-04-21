@@ -16,13 +16,14 @@ NEXT:
     only look at movies (by ID) that we do not have
     (cannot update movies, so only need to worry about new movies)
 """
+DB_URI = "postgresql+psycopg2://jacinda@localhost:5432/bechdel"
 
-def database_setup(db_name="bechdel"):
+def database_setup(db_uri, db_name="bechdel"):
     """
     Later: save movie data to movies table (?)
     TODO: how to set utc timezone default for date_created/date_modified?
     """
-    engine = create_engine("postgresql+psycopg2://jacinda@localhost:5432/bechdel")
+    engine = create_engine(db_uri)
     meta = MetaData(engine)
     table = Table("movie_year_counts", meta,
                    Column('id', Integer, primary_key=True),
@@ -32,6 +33,45 @@ def database_setup(db_name="bechdel"):
                    Column('date_modified', DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
                   )
     meta.create_all()
+
+
+def find_movie_counts(bechdel_url="https://bechdeltest.com/?list=all"):
+    """
+    Scrape https://bechdeltest.com/?list=all
+    Only look at headers for year + the count per year
+
+    Hmmm, maybe need to load per page
+    """
+    movies_per_year = {}
+    html = requests.get(bechdel_url).text
+    soup = BeautifulSoup(html, 'html.parser')
+
+    year_counts = soup.find_all('h3')
+
+    for year_count in year_counts:
+        year_count = year_counts[counter]
+        year = int(year_count.find("a").get("id").split("-")[1])
+        num_movies = int(year_count.find("span").text.split(" ")[0][1:])
+        movies_per_year[year] = num_movies
+
+    return movies_per_year
+
+
+def years_to_scrape(bechdel_movie_counts, db_uri):
+    """
+    Query movie_year_counts and compare with bechdel website
+    Input: current counts per year from Bechdel website
+
+    Return: list of years where counts < bechdel website
+      > therefore, for those years, there are new movie entries
+    """
+
+    # Query my table:
+    #   > only need year + count
+    #   > want it to be dictionary[year] = count
+    # Iterate over bechdel_movie_counts
+    #   > if bechdel_count == my_counts[year], then continue
+    #   > else: res.append(year)
 
 
 def process_movies(all_movies):
@@ -67,8 +107,8 @@ def process_movies(all_movies):
     return processed_movies
 
 
-def scrape(bechdel_test_url):
-    html = requests.get(bechdel_test_url).text
+def scrape(bechdel_url):
+    html = requests.get(bechdel_url).text
     soup = BeautifulSoup(html, 'html.parser')
 
     all_movies = soup.find_all('div', attrs='movie')
@@ -81,4 +121,5 @@ page1 = "https://bechdeltest.com/?page=1"
 page42 = "https://bechdeltest.com/?page=42"
 
 # print(scrape("https://bechdeltest.com/?page=19"))
-database_setup()
+# database_setup()
+print(find_movie_counts())
