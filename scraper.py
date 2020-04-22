@@ -1,4 +1,6 @@
 import datetime
+import logging
+import os
 import re
 import requests
 from bs4 import BeautifulSoup,SoupStrainer
@@ -17,6 +19,11 @@ NEXT:
     (cannot update movies, so only need to worry about new movies)
 """
 DB_URI = "postgresql+psycopg2://jacinda@localhost:5432/bechdel"
+MOVIE_COUNTS_TABLE_NAME = "movie_year_counts"
+
+LOGGER = logging.getLogger("bechdel_scraping")
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+
 
 def database_setup(db_uri, db_name="bechdel"):
     """
@@ -25,7 +32,7 @@ def database_setup(db_uri, db_name="bechdel"):
     """
     engine = create_engine(db_uri)
     meta = MetaData(engine)
-    table = Table("movie_year_counts", meta,
+    table = Table(MOVIE_COUNTS_TABLE_NAME, meta,
                    Column('id', Integer, primary_key=True),
                    Column('year', Integer, nullable=False),
                    Column('count', Integer, nullable=False),
@@ -33,6 +40,7 @@ def database_setup(db_uri, db_name="bechdel"):
                    Column('date_modified', DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
                   )
     meta.create_all()
+    LOGGER.info(f"Created table: {MOVIE_COUNTS_TABLE_NAME}")
 
 
 def find_movie_counts(bechdel_url="https://bechdeltest.com/?list=all"):
@@ -48,11 +56,12 @@ def find_movie_counts(bechdel_url="https://bechdeltest.com/?list=all"):
        per movie: 1 div + 2 <a> tags
      > years span 1888 - 2020 (132 years)
     """
-    movies_per_year = {}
+    movies_per_year = []
     html = requests.get(bechdel_url).text
     soup = BeautifulSoup(html, "html.parser", parse_only=SoupStrainer("h3"))
+    LOGGER.info("Parsed h3 elements for movie counts per year")
 
-    for year_count in soup.find_all(True):
+    for year_count in soup.find_all(True, recursive=False):
         if year_count.find("a") and year_count.find("a").get("id"):
             id_text = year_count.find("a").get("id").split("-")
             if len(id_text) == 2 and id_text[1].isdigit():
@@ -63,10 +72,65 @@ def find_movie_counts(bechdel_url="https://bechdeltest.com/?list=all"):
                 else:
                     num_movies = 0
 
-                movies_per_year[year] = num_movies
+                movies_per_year.append((year, num_movies))
+            else:
+                LOGGER.warning(f"Could not find movie count for year {year}, html: {id_text}")
+        else:
+            LOGGER.warning(f"Could not find year in <a> tag: {year_count}")
 
+    LOGGER.info("Completed scraping movie counts per year.")
     return movies_per_year
 
+
+def save_movie_counts(db_uri, table, year_counts):
+    """
+    Given a dictonary: { 2020: 1234 }
+      > save this to MOVIE_COUNTS_TABLE_NAME
+    """
+    LOGGER.info(f"Grabbed year_counts from bechdel website, from: {min(year_counts)}, to: {max(year_counts)}")
+    engine = create_engine(db_uri)
+
+    updated_rows = 0
+    inserted_rows = 0
+    no_change_rows = 0
+    for scraped_year,scraped_count in year_counts:
+        # if year already exists, update the value
+        does_year_exist = f"""
+        select count from {table} where year = {scraped_year}
+        """
+        count_row = engine.execute(does_year_exist).fetchall()
+
+        if count_row:
+            count_in_db = count_row[0][0]
+            if count_in_db != scraped_count:
+                update_count = f"""
+                UPDATE {table} SET count = {scraped_count}
+                WHERE year = {scraped_year};
+                """
+                engine.execute(update_count)
+                LOGGER.info(f"Updated count for year: {scraped_year}, new count: {scraped_count}")
+                updated_rows += 1
+            else:
+                no_change_rows += 1
+
+        else:
+            insert = f"""
+            INSERT INTO {table}
+            (year, count)
+            VALUES (
+            {scraped_year}, {scraped_count}
+            )
+            """
+            engine.execute(insert)
+            inserted_rows += 1
+
+    LOGGER.info(f"Inserted {inserted_rows}, Updated {updated_rows}, No change {no_change_rows}")
+
+
+def scrape_and_save_movie_counts():
+    database_setup(DB_URI)
+    year_counts = find_movie_counts()
+    save_movie_counts(DB_URI, MOVIE_COUNTS_TABLE_NAME, year_counts)
 
 def years_to_scrape(bechdel_movie_counts, db_uri):
     """
@@ -83,6 +147,22 @@ def years_to_scrape(bechdel_movie_counts, db_uri):
     # Iterate over bechdel_movie_counts
     #   > if bechdel_count == my_counts[year], then continue
     #   > else: res.append(year)
+    pass
+
+
+def insert_movies(movies):
+    """
+    FIRST: see how long it takes to insert 1 row
+    at a time for 8k records
+    (use psycopg NOT sqlalchemy)
+
+    Instead of a dictionary, change process_movies
+      > to create a CSV file if > 10,000 records
+      > use postgres COPY to bulk insert
+      > delete CSV file
+    """
+    # start with batch of 1000 for inserts
+    pass
 
 
 def process_movies(all_movies):
@@ -134,6 +214,8 @@ def scrape(bechdel_url):
     html = requests.get(bechdel_url).text
     movie_soup = BeautifulSoup(html, "html.parser", parse_only=SoupStrainer("div"))
     all_movies = movie_soup.find_all(attrs="movie", recursive=False)
+    LOGGER.info("Parsed and filtered down to div tags with attr movie.")
+
     return process_movies(all_movies)
 
 
@@ -142,6 +224,4 @@ all_movies_url = "https://bechdeltest.com/?list=all"
 page1 = "https://bechdeltest.com/?page=1"
 page42 = "https://bechdeltest.com/?page=42"
 
-# scrape(all_movies_url)
-# database_setup()
-# print(find_movie_counts())
+scrape_and_save_movie_counts()
