@@ -225,4 +225,4 @@ all_movies_url = "https://bechdeltest.com/?list=all"
 page1 = "https://bechdeltest.com/?page=1"
 page42 = "https://bechdeltest.com/?page=42"
 
-scrape_and_save_movie_counts()
+# scrape_and_save_movie_counts()
