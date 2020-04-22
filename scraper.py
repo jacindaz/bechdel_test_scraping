@@ -49,10 +49,17 @@ def find_movie_counts(bechdel_url="https://bechdeltest.com/?list=all"):
     year_counts = soup.find_all('h3')
 
     for year_count in year_counts:
-        year_count = year_counts[counter]
-        year = int(year_count.find("a").get("id").split("-")[1])
-        num_movies = int(year_count.find("span").text.split(" ")[0][1:])
-        movies_per_year[year] = num_movies
+        if year_count.find("a") and year_count.find("a").get("id"):
+            id_text = year_count.find("a").get("id").split("-")
+            if len(id_text) == 2 and id_text[1].isdigit():
+                year = int(year_count.find("a").get("id").split("-")[1])
+
+                if year_count.find("span") and year_count.find("span").text:
+                    num_movies = int(year_count.find("span").text.split(" ")[0][1:])
+                else:
+                    num_movies = 0
+
+                movies_per_year[year] = num_movies
 
     return movies_per_year
 
