@@ -74,7 +74,8 @@ def find_movie_counts(bechdel_url="https://bechdeltest.com/?list=all"):
 
                 movies_per_year.append((year, num_movies))
             else:
-                LOGGER.warning(f"Could not find movie count for year {year}, html: {id_text}")
+                maybe_year = year_count.find("a").get("id")
+                LOGGER.warning(f"Could not find movie count for year {maybe_year}, html: {id_text}")
         else:
             LOGGER.warning(f"Could not find year in <a> tag: {year_count}")
 

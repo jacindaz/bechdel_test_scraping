@@ -65,32 +65,32 @@ def test_passed_movie(movie_html, expected):
 @pytest.mark.parametrize("response, expected", [
     pytest.param(
         '<h3><a id="year-2020"></a>2020 <span style="font-size: 10pt; color: gray; font-weight: normal;">(18 movies)</span></h3>',
-        {2020: 18},
+        [(2020, 18)],
         id="happy_path"
     ),
     pytest.param(
         '<h3><a id="year-1820"></a>2020 <span style="font-size: 10pt; color: gray; font-weight: normal;"></span></h3>',
-        {1820: 0},
+        [(1820, 0)],
         id="no_movies"
     ),
     pytest.param(
         '<h3><a id="year-2020"></a>2020(18 movies)</h3>',
-        {2020: 0},
+        [(2020, 0)],
         id="no_span_for_movies"
     ),
     pytest.param(
         '<h3><a id="not-ayear"></a>2020 <span style="font-size: 10pt; color: gray; font-weight: normal;">(27 movies)</span></h3>',
-        {},
+        [],
         id="year_is_str_in_id"
     ),
     pytest.param(
         '<h3><a id="hello"></a>2020 <span style="font-size: 10pt; color: gray; font-weight: normal;">(27 movies)</span></h3>',
-        {},
+        [],
         id="no_year_in_id"
     ),
     pytest.param(
         '<h3><a></a>2020 <span style="font-size: 10pt; color: gray; font-weight: normal;">(27 movies)</span></h3>',
-        {},
+        [],
         id="no_id"
     )
 ])
