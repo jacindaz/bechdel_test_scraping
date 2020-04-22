@@ -95,9 +95,6 @@ def test_passed_movie(movie_html, expected):
     )
 ])
 def test_find_movie_counts(response, expected):
-    # stub out requests.get
-    # expected return:
-    # {2020: 20, 2019: 19}
     with requests_mock.Mocker() as m:
         m.get("https://bechdeltest.com/?list=all", text=response)
 

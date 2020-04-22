@@ -1,7 +1,7 @@
 import datetime
 import re
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup,SoupStrainer
 
 from sqlalchemy import create_engine, MetaData, Table, Column, DateTime, Integer
 from sqlalchemy.sql import func
@@ -38,17 +38,21 @@ def database_setup(db_uri, db_name="bechdel"):
 def find_movie_counts(bechdel_url="https://bechdeltest.com/?list=all"):
     """
     Scrape https://bechdeltest.com/?list=all
-    Only look at headers for year + the count per year
+     > retreive counts for # movies per year
+     > handle edge cases:
+         if year doesn't exist
+         if movie count doesn't exist
 
-    Hmmm, maybe need to load per page
+    For future: consider loading counts per page
+     > about 8,000 movies total
+       per movie: 1 div + 2 <a> tags
+     > years span 1888 - 2020 (132 years)
     """
     movies_per_year = {}
     html = requests.get(bechdel_url).text
-    soup = BeautifulSoup(html, 'html.parser')
+    soup = BeautifulSoup(html, "html.parser", parse_only=SoupStrainer("h3"))
 
-    year_counts = soup.find_all('h3')
-
-    for year_count in year_counts:
+    for year_count in soup.find_all(True):
         if year_count.find("a") and year_count.find("a").get("id"):
             id_text = year_count.find("a").get("id").split("-")
             if len(id_text) == 2 and id_text[1].isdigit():
