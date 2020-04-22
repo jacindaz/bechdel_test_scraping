@@ -25,14 +25,14 @@ LOGGER = logging.getLogger("bechdel_scraping")
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
-def database_setup(db_uri, db_name="bechdel"):
+def database_setup(db_uri, table_name=MOVIE_COUNTS_TABLE_NAME):
     """
     Later: save movie data to movies table (?)
     TODO: how to set utc timezone default for date_created/date_modified?
     """
     engine = create_engine(db_uri)
     meta = MetaData(engine)
-    table = Table(MOVIE_COUNTS_TABLE_NAME, meta,
+    table = Table(table_name, meta,
                    Column('id', Integer, primary_key=True),
                    Column('year', Integer, nullable=False),
                    Column('count', Integer, nullable=False),
@@ -40,7 +40,7 @@ def database_setup(db_uri, db_name="bechdel"):
                    Column('date_modified', DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
                   )
     meta.create_all()
-    LOGGER.info(f"Created table: {MOVIE_COUNTS_TABLE_NAME}")
+    LOGGER.info(f"Created table: {table_name}")
 
 
 def find_movie_counts(bechdel_url="https://bechdeltest.com/?list=all"):
