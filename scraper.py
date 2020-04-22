@@ -22,12 +22,11 @@ DB_URI = "postgresql+psycopg2://jacinda@localhost:5432/bechdel"
 MOVIE_COUNTS_TABLE_NAME = "movie_year_counts"
 
 LOGGER = logging.getLogger("bechdel_scraping")
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+# logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
 def database_setup(db_uri, table_name=MOVIE_COUNTS_TABLE_NAME):
     """
-    Later: save movie data to movies table (?)
     TODO: how to set utc timezone default for date_created/date_modified?
     """
     engine = create_engine(db_uri)
