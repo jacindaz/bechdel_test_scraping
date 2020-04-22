@@ -11,21 +11,23 @@ PASSED_MOVIE_HTML = '<div class="movie"><a href="http://us.imdb.com/title/tt3907
 NOT_PASSED_MOVIE_HTML = '<div class="movie"><a href="http://us.imdb.com/title/tt7458762/"><img alt="[[0]]" src="/static/nopass.png" title="[Fewer than two women in this movie]"/></a> <a href="/view/8655/le_chant_du_loup/" id="movie-8655">Le chant du loup</a> <a href="/view/8655/le_chant_du_loup/" onclick="showComments("8655"); return false;"><img alt="[2 comment(s) available]" id="comment-img-8655" src="/static/comments.png" style="height: 10px; width: 10px;" title="2 comments"/></a> </div>'
 
 
-@pytest.mark.parametrize("movie_html,expected_keys",
+@pytest.mark.parametrize("movie_html,expected_keys,expected_pass_value",
     [
         pytest.param(
             PASSED_MOVIE_HTML,
             ['bechdel_id', 'bechdel_url', 'imdb_url', 'pass', 'title'],
+            True,
             id="passed_movie"
         ),
         pytest.param(
             NOT_PASSED_MOVIE_HTML,
             ['bechdel_id', 'bechdel_url', 'imdb_url', 'pass', 'title'],
+            False,
             id="not_passed_movie"
         ),
 
 ])
-def test_data_elements_populated(movie_html, expected_keys):
+def test_process_movies(movie_html, expected_keys, expected_pass_value):
     soup = BeautifulSoup(movie_html, 'html.parser')
     processed_movies = process_movies([soup])
 
@@ -35,31 +37,9 @@ def test_data_elements_populated(movie_html, expected_keys):
     for val in list(processed_movie.values()):
         assert val is not None
     assert int(processed_movie["bechdel_id"])
-    assert type(processed_movie["pass"]) == bool
-    assert re.search('.com', processed_movie["bechdel_url"])
-    assert re.search('.com', processed_movie["imdb_url"])
-
-
-@pytest.mark.parametrize("movie_html,expected",
-    [
-        pytest.param(
-            PASSED_MOVIE_HTML,
-            True,
-            id="passed_movie"
-        ),
-        pytest.param(
-            NOT_PASSED_MOVIE_HTML,
-            False,
-            id="not_passed_movie"
-        ),
-
-])
-def test_passed_movie(movie_html, expected):
-    soup = BeautifulSoup(movie_html, 'html.parser')
-    processed_movies = process_movies([soup])
-
-    processed_movie = processed_movies[0]
-    assert processed_movie["pass"] == expected
+    assert processed_movie["pass"] == expected_pass_value
+    assert re.search('bechdeltest.com', processed_movie["bechdel_url"])
+    assert re.search('imdb.com', processed_movie["imdb_url"])
 
 
 @pytest.mark.parametrize("response, expected", [
@@ -100,3 +80,4 @@ def test_find_movie_counts(response, expected):
 
         movies_per_year = find_movie_counts()
         assert movies_per_year == expected
+
