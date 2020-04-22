@@ -22,7 +22,7 @@ DB_URI = "postgresql+psycopg2://jacinda@localhost:5432/bechdel"
 MOVIE_COUNTS_TABLE_NAME = "movie_year_counts"
 
 LOGGER = logging.getLogger("bechdel_scraping")
-# logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
 def database_setup(db_uri, table_name=MOVIE_COUNTS_TABLE_NAME):
@@ -93,6 +93,8 @@ def save_movie_counts(db_uri, table, year_counts):
     updated_rows = 0
     inserted_rows = 0
     no_change_rows = 0
+
+    different_counts_or_new_years = []
     for scraped_year,scraped_count in year_counts:
         # if year already exists, update the value
         does_year_exist = f"""
@@ -109,7 +111,9 @@ def save_movie_counts(db_uri, table, year_counts):
                 """
                 engine.execute(update_count)
                 LOGGER.info(f"Updated count for year: {scraped_year}, new count: {scraped_count}")
+
                 updated_rows += 1
+                different_counts_or_new_years.append(scraped_year)
             else:
                 no_change_rows += 1
 
@@ -122,50 +126,26 @@ def save_movie_counts(db_uri, table, year_counts):
             )
             """
             engine.execute(insert)
+
             inserted_rows += 1
+            different_counts_or_new_years.append(scraped_year)
 
     LOGGER.info(f"Inserted {inserted_rows}, Updated {updated_rows}, No change {no_change_rows}")
+    return different_counts_or_new_years
 
 
 def scrape_and_save_movie_counts():
     database_setup(DB_URI)
     year_counts = find_movie_counts()
-    save_movie_counts(DB_URI, MOVIE_COUNTS_TABLE_NAME, year_counts)
-
-def years_to_scrape(bechdel_movie_counts, db_uri):
-    """
-    Query movie_year_counts and compare with bechdel website
-    Input: current counts per year from Bechdel website
-
-    Return: list of years where counts < bechdel website
-      > therefore, for those years, there are new movie entries
-    """
-
-    # Query my table:
-    #   > only need year + count
-    #   > want it to be dictionary[year] = count
-    # Iterate over bechdel_movie_counts
-    #   > if bechdel_count == my_counts[year], then continue
-    #   > else: res.append(year)
-    pass
-
-
-def insert_movies(movies):
-    """
-    FIRST: see how long it takes to insert 1 row
-    at a time for 8k records
-    (use psycopg NOT sqlalchemy)
-
-    Instead of a dictionary, change process_movies
-      > to create a CSV file if > 10,000 records
-      > use postgres COPY to bulk insert
-      > delete CSV file
-    """
-    # start with batch of 1000 for inserts
-    pass
+    years_to_scrape = save_movie_counts(DB_URI, MOVIE_COUNTS_TABLE_NAME, year_counts)
+    return years_to_scrape
 
 
 def process_movies(all_movies):
+    """
+    Input: all_movies is a list of <div> tags
+    Output: return list of dictionaries with movie data
+    """
     processed_movies = []
     for movie in all_movies:
         new_movie = {
@@ -198,7 +178,7 @@ def process_movies(all_movies):
     return processed_movies
 
 
-def scrape(bechdel_url):
+def scrape_movies_by_year():
     """
     Parse the list of all movies
 
@@ -211,12 +191,32 @@ def scrape(bechdel_url):
        (none exist since movie <div> tags do not have nested
         <div> tags, but cuts down on the tree traversal)
     """
-    html = requests.get(bechdel_url).text
-    movie_soup = BeautifulSoup(html, "html.parser", parse_only=SoupStrainer("div"))
-    all_movies = movie_soup.find_all(attrs="movie", recursive=False)
-    LOGGER.info("Parsed and filtered down to div tags with attr movie.")
+    years_to_scrape = scrape_and_save_movie_counts()
+    if years_to_scrape == []: LOGGER.info("No movies to scrape, all up-to-date.")
 
-    return process_movies(all_movies)
+    new_movies = []
+    for year in years_to_scrape:
+        bechdel_url = f"http://bechdeltest.com/year/{year}"
+        html = requests.get(bechdel_url).text
+        movie_soup = BeautifulSoup(html, "html.parser", parse_only=SoupStrainer("div", attrs="movie"))
+        all_movies = movie_soup.find_all("div", recursive=False)
+        new_movies += process_movies(all_movies)
+    return new_movies
+
+
+def insert_movies(movies):
+    """
+    FIRST: see how long it takes to insert 1 row
+    at a time for 8k records
+    (use psycopg NOT sqlalchemy)
+
+    Instead of a dictionary, change process_movies
+      > to create a CSV file if > 10,000 records
+      > use postgres COPY to bulk insert
+      > delete CSV file
+    """
+    # start with batch of 1000 for inserts
+    pass
 
 
 homepage = "https://bechdeltest.com/"
@@ -224,4 +224,4 @@ all_movies_url = "https://bechdeltest.com/?list=all"
 page1 = "https://bechdeltest.com/?page=1"
 page42 = "https://bechdeltest.com/?page=42"
 
-# scrape_and_save_movie_counts()
+print(scrape_movies_by_year())
