@@ -96,7 +96,6 @@ def process_movies(all_movies):
             "pass": "",
         }
         all_urls = movie.find_all('a')
-
         for url in all_urls:
             url_href = url.get('href')
 
@@ -114,15 +113,27 @@ def process_movies(all_movies):
                     new_movie["title"] = url.text
                 if url.get("id"):
                     new_movie["bechdel_id"] = url.get("id").split("-")[1]
+
         processed_movies.append(new_movie)
     return processed_movies
 
 
 def scrape(bechdel_url):
-    html = requests.get(bechdel_url).text
-    soup = BeautifulSoup(html, 'html.parser')
+    """
+    Parse the list of all movies
 
-    all_movies = soup.find_all('div', attrs='movie')
+    Parsing operations:
+     > Parse only <div> tags
+     > Filter down to elements with "movie" attr
+     > recursive=False: only look at the first
+       set of <div> tags found - don't continue searching
+       the tree for children <div> tags
+       (none exist since movie <div> tags do not have nested
+        <div> tags, but cuts down on the tree traversal)
+    """
+    html = requests.get(bechdel_url).text
+    movie_soup = BeautifulSoup(html, "html.parser", parse_only=SoupStrainer("div"))
+    all_movies = movie_soup.find_all(attrs="movie", recursive=False)
     return process_movies(all_movies)
 
 
@@ -131,6 +142,6 @@ all_movies_url = "https://bechdeltest.com/?list=all"
 page1 = "https://bechdeltest.com/?page=1"
 page42 = "https://bechdeltest.com/?page=42"
 
-# print(scrape("https://bechdeltest.com/?page=19"))
+# scrape(all_movies_url)
 # database_setup()
 # print(find_movie_counts())
