@@ -54,6 +54,58 @@ def test_find_movie_counts(response, expected):
         assert movies_per_year == expected
 
 
+@pytest.mark.parametrize("old_movie_count,cur_year,new_movie_counts,exp_metacommand,exp_sql1,exp_sql2", [
+    pytest.param(
+        [[0]],
+        2020,
+        [(2020, 123)],
+        "update",
+        "set count = 123",
+        "where year = 2020",
+        id="update_new_count"
+    ),
+    pytest.param(
+        [],
+        1998,
+        [(1998, 567)],
+        "insert",
+        "(year, count)",
+        "( 1998, 567 )",
+        id="insert_new_count"
+    ),
+])
+def test_save_movie_counts( \
+    mocked_sqlalchemy_engine,mocked_engine_execute,mocker, \
+    old_movie_count,cur_year,new_movie_counts, \
+    exp_metacommand,exp_sql1,exp_sql2 \
+):
+    """
+    Tests save_movie_counts
+      > mocks SqlAlchemy engine
+      > mocks engine.execute
+
+    SQL checks:
+      > insert happens for a year I do not have
+      > update happens for a count different from newly
+        scraped count, for a given year
+    """
+    mocker.patch('bechdel_test.scraper.find_year_counts_in_db', return_value=old_movie_count)
+    save_movie_counts(MOVIE_COUNTS_TABLE_NAME, new_movie_counts)
+
+    # extracting input arguments
+    arguments,_ = mocked_engine_execute.call_args_list[0]
+    mocked_engine,sql_input = arguments
+    sql_input = " ".join([x.rstrip() for x in sql_input.split(" ") if x]).strip().lower()
+
+    # assert an update was done
+    assert re.match(exp_metacommand, sql_input)
+    assert exp_sql1 in sql_input
+    assert exp_sql2 in sql_input
+
+    # assert a call to the database was made
+    mocked_engine_execute.assert_called()
+
+
 def test_save_movie_counts_no_change(mocked_sqlalchemy_engine, mocked_engine_execute, mocker):
     """
     Tests save_movie_counts
@@ -65,10 +117,9 @@ def test_save_movie_counts_no_change(mocked_sqlalchemy_engine, mocked_engine_exe
         scraped year + count
     """
 
+    # mock find_year_counts_in_db
     old_movie_and_new_movie_count = 123
     cur_year = 2020
-
-    # mock find_year_counts_in_db
     mocker.patch('bechdel_test.scraper.find_year_counts_in_db', return_value=[[old_movie_and_new_movie_count]])
 
     new_movie_counts = [(cur_year, old_movie_and_new_movie_count)]

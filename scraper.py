@@ -86,7 +86,7 @@ def _create_engine():
     return create_engine(DB_URI)
 
 
-def _execute(engine, sql):
+def _execute_sql(engine, sql):
     return engine.execute(sql)
 
 
@@ -94,7 +94,7 @@ def find_year_counts_in_db(engine):
     does_year_exist = f"""
     select count from {table} where year = {scraped_year}
     """
-    return _execute(engine, does_year_exist).fetchall()
+    return _execute_sql(engine, does_year_exist).fetchall()
 
 
 def save_movie_counts(table, year_counts):
@@ -120,7 +120,7 @@ def save_movie_counts(table, year_counts):
     different_counts_or_new_years = []
     for scraped_year,scraped_count in year_counts:
         counts_row = find_year_counts_in_db(engine)
-        LOGGER.info(f"Counts per year found in db: {counts_row[0][0]}")
+        LOGGER.info(f"Counts per year found in db: {counts_row}")
 
         if counts_row:
             count_in_db = counts_row[0][0]
@@ -130,7 +130,7 @@ def save_movie_counts(table, year_counts):
                 UPDATE {table} SET count = {scraped_count}
                 WHERE year = {scraped_year};
                 """
-                _execute(engine, update_count)
+                _execute_sql(engine, update_count)
                 LOGGER.info(f"Updated count for year: {scraped_year}, new count: {scraped_count}")
 
                 updated_rows += 1
@@ -146,7 +146,7 @@ def save_movie_counts(table, year_counts):
             {scraped_year}, {scraped_count}
             )
             """
-            _execute(insert)
+            _execute_sql(engine, insert)
 
             inserted_rows += 1
             different_counts_or_new_years.append(scraped_year)

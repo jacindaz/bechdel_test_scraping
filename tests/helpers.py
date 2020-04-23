@@ -15,4 +15,4 @@ def mocked_sqlalchemy_engine(mocker):
 
 @pytest.fixture()
 def mocked_engine_execute(mocker):
-    return mocker.patch('bechdel_test.scraper._execute')
+    return mocker.patch('bechdel_test.scraper._execute_sql')
