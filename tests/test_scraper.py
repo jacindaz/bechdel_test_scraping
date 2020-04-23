@@ -3,9 +3,12 @@ import re
 import pytest
 import requests
 
-from scraper import process_movies,find_movie_counts
+from bechdel_test.scraper import process_movies,find_movie_counts,save_movie_counts,MOVIE_COUNTS_TABLE_NAME
+import bechdel_test.scraper
+from bechdel_test.tests.helpers import mocked_sqlalchemy_engine, mocked_engine_execute
 import requests_mock
-
+import sqlalchemy
+from unittest import mock
 
 PASSED_MOVIE_HTML = '<div class="movie"><a href="http://us.imdb.com/title/tt3907584/"><img alt="[[3]]" src="/static/pass.png" title="[There are two or more women in this movie and they talk to each other about something other than a man]"/></a><a href="/view/9036/all_the_bright_places/" id="movie-9036">All the Bright Places</a> <a href="/view/9036/all_the_bright_places/" onclick="showComments("9036"); return false;"><img alt="[1 comment(s) available]" id="comment-img-9036" src="/static/comments.png" style="height: 10px; width: 10px;" title="1 comment"/></a> </div>'
 NOT_PASSED_MOVIE_HTML = '<div class="movie"><a href="http://us.imdb.com/title/tt7458762/"><img alt="[[0]]" src="/static/nopass.png" title="[Fewer than two women in this movie]"/></a> <a href="/view/8655/le_chant_du_loup/" id="movie-8655">Le chant du loup</a> <a href="/view/8655/le_chant_du_loup/" onclick="showComments("8655"); return false;"><img alt="[2 comment(s) available]" id="comment-img-8655" src="/static/comments.png" style="height: 10px; width: 10px;" title="2 comments"/></a> </div>'
@@ -51,8 +54,28 @@ def test_find_movie_counts(response, expected):
         assert movies_per_year == expected
 
 
-def test_save_movie_counts():
-    pass
+def test_save_movie_counts_no_change(mocked_sqlalchemy_engine, mocked_engine_execute, mocker):
+    """
+    Tests save_movie_counts
+      > mocks SqlAlchemy engine
+      > mocks engine.execute
+
+    SQL checks:
+      > nothing happens if year + count are the same as newly
+        scraped year + count
+    """
+
+    old_movie_and_new_movie_count = 123
+    cur_year = 2020
+
+    # mock find_year_counts_in_db
+    mocker.patch('bechdel_test.scraper.find_year_counts_in_db', return_value=[[old_movie_and_new_movie_count]])
+
+    new_movie_counts = [(cur_year, old_movie_and_new_movie_count)]
+    save_movie_counts(MOVIE_COUNTS_TABLE_NAME, new_movie_counts)
+
+    # assert a call to the database was NOT made
+    mocked_engine_execute.assert_not_called()
 
 
 @pytest.mark.parametrize("movie_html,expected_keys,expected_pass_value",
@@ -69,7 +92,6 @@ def test_save_movie_counts():
             False,
             id="not_passed_movie"
         ),
-
 ])
 def test_process_movies(movie_html, expected_keys, expected_pass_value):
     soup = BeautifulSoup(movie_html, 'html.parser')

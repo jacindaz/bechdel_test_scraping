@@ -82,13 +82,36 @@ def find_movie_counts(bechdel_url="https://bechdeltest.com/?list=all"):
     return movies_per_year
 
 
-def save_movie_counts(db_uri, table, year_counts):
+def _create_engine():
+    return create_engine(DB_URI)
+
+
+def _execute(engine, sql):
+    return engine.execute(sql)
+
+
+def find_year_counts_in_db(engine):
+    does_year_exist = f"""
+    select count from {table} where year = {scraped_year}
+    """
+    return _execute(engine, does_year_exist).fetchall()
+
+
+def save_movie_counts(table, year_counts):
     """
     Given a dictonary: { 2020: 1234 }
       > save this to MOVIE_COUNTS_TABLE_NAME
+      > insert: when year doesn't exist
+      > update: when count in db is different from scraped_count
+      > no action: year and count are the same as scraped
+
+    Output: list of years
+      > where the count is different in the db
+        than the scraped_count
+      > or the year is new, and didn't exist in the db
     """
     LOGGER.info(f"Grabbed year_counts from bechdel website, from: {min(year_counts)}, to: {max(year_counts)}")
-    engine = create_engine(db_uri)
+    engine = _create_engine()
 
     updated_rows = 0
     inserted_rows = 0
@@ -96,20 +119,18 @@ def save_movie_counts(db_uri, table, year_counts):
 
     different_counts_or_new_years = []
     for scraped_year,scraped_count in year_counts:
-        # if year already exists, update the value
-        does_year_exist = f"""
-        select count from {table} where year = {scraped_year}
-        """
-        count_row = engine.execute(does_year_exist).fetchall()
+        counts_row = find_year_counts_in_db(engine)
+        LOGGER.info(f"Counts per year found in db: {counts_row[0][0]}")
 
-        if count_row:
-            count_in_db = count_row[0][0]
+        if counts_row:
+            count_in_db = counts_row[0][0]
             if count_in_db != scraped_count:
+                print(f"count_in_db: {count_in_db}, scraped_count: {scraped_count}")
                 update_count = f"""
                 UPDATE {table} SET count = {scraped_count}
                 WHERE year = {scraped_year};
                 """
-                engine.execute(update_count)
+                _execute(engine, update_count)
                 LOGGER.info(f"Updated count for year: {scraped_year}, new count: {scraped_count}")
 
                 updated_rows += 1
@@ -125,7 +146,7 @@ def save_movie_counts(db_uri, table, year_counts):
             {scraped_year}, {scraped_count}
             )
             """
-            engine.execute(insert)
+            _execute(insert)
 
             inserted_rows += 1
             different_counts_or_new_years.append(scraped_year)
@@ -224,4 +245,4 @@ all_movies_url = "https://bechdeltest.com/?list=all"
 page1 = "https://bechdeltest.com/?page=1"
 page42 = "https://bechdeltest.com/?page=42"
 
-print(scrape_movies_by_year())
+# print(scrape_movies_by_year())
