@@ -8,16 +8,7 @@ from bs4 import BeautifulSoup,SoupStrainer
 from sqlalchemy import create_engine, MetaData, Table, Column, DateTime, Integer
 from sqlalchemy.sql import func
 
-"""
-NEXT:
- > create metadata table:
-   has counts of movies per year
-   when last scraped (?) (not sure if need)
- > get movie counts
- > get movies by year:
-    only look at movies (by ID) that we do not have
-    (cannot update movies, so only need to worry about new movies)
-"""
+
 DB_URI = "postgresql+psycopg2://jacinda@localhost:5432/bechdel"
 MOVIE_COUNTS_TABLE_NAME = "movie_year_counts"
 
@@ -120,10 +111,10 @@ def save_movie_counts(table, year_counts):
     different_counts_or_new_years = []
     for scraped_year,scraped_count in year_counts:
         counts_row = find_year_counts_in_db(engine)
-        LOGGER.info(f"Counts per year found in db: {counts_row}")
-
         if counts_row:
             count_in_db = counts_row[0][0]
+
+            # Update
             if count_in_db != scraped_count:
                 print(f"count_in_db: {count_in_db}, scraped_count: {scraped_count}")
                 update_count = f"""
@@ -135,10 +126,12 @@ def save_movie_counts(table, year_counts):
 
                 updated_rows += 1
                 different_counts_or_new_years.append(scraped_year)
+
+            # No change
             else:
                 no_change_rows += 1
 
-        else:
+        else: # Insert
             insert = f"""
             INSERT INTO {table}
             (year, count)

@@ -4,11 +4,9 @@ import pytest
 import requests
 
 from bechdel_test.scraper import process_movies,find_movie_counts,save_movie_counts,MOVIE_COUNTS_TABLE_NAME
-import bechdel_test.scraper
 from bechdel_test.tests.helpers import mocked_sqlalchemy_engine, mocked_engine_execute
 import requests_mock
-import sqlalchemy
-from unittest import mock
+
 
 PASSED_MOVIE_HTML = '<div class="movie"><a href="http://us.imdb.com/title/tt3907584/"><img alt="[[3]]" src="/static/pass.png" title="[There are two or more women in this movie and they talk to each other about something other than a man]"/></a><a href="/view/9036/all_the_bright_places/" id="movie-9036">All the Bright Places</a> <a href="/view/9036/all_the_bright_places/" onclick="showComments("9036"); return false;"><img alt="[1 comment(s) available]" id="comment-img-9036" src="/static/comments.png" style="height: 10px; width: 10px;" title="1 comment"/></a> </div>'
 NOT_PASSED_MOVIE_HTML = '<div class="movie"><a href="http://us.imdb.com/title/tt7458762/"><img alt="[[0]]" src="/static/nopass.png" title="[Fewer than two women in this movie]"/></a> <a href="/view/8655/le_chant_du_loup/" id="movie-8655">Le chant du loup</a> <a href="/view/8655/le_chant_du_loup/" onclick="showComments("8655"); return false;"><img alt="[2 comment(s) available]" id="comment-img-8655" src="/static/comments.png" style="height: 10px; width: 10px;" title="2 comments"/></a> </div>'
@@ -80,9 +78,7 @@ def test_save_movie_counts( \
     exp_metacommand,exp_sql1,exp_sql2 \
 ):
     """
-    Tests save_movie_counts
-      > mocks SqlAlchemy engine
-      > mocks engine.execute
+    Tests save_movie_counts: mocks SqlAlchemy engine + execute
 
     SQL checks:
       > insert happens for a year I do not have
@@ -97,7 +93,7 @@ def test_save_movie_counts( \
     mocked_engine,sql_input = arguments
     sql_input = " ".join([x.rstrip() for x in sql_input.split(" ") if x]).strip().lower()
 
-    # assert an update was done
+    # assert an update/insert was done
     assert re.match(exp_metacommand, sql_input)
     assert exp_sql1 in sql_input
     assert exp_sql2 in sql_input
